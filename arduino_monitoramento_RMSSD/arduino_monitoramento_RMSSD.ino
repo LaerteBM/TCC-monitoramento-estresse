@@ -9,14 +9,10 @@
 #include <BH1750.h>
 
 //DEFINIÇÃO DE PINOS
-#define pinInterrupcao 2
 #define pinSensor 7             //Pino utilizado para ler o valor do Sensor DHT22
 const int PulseWire = A0;       // Pino utilizado para medir receber a saída do Sensor monitor cardíaco
 const int LED13 = 13;          // Determina que o Pin 13 que corresponde ao LED  imbuitido no arduino pisque quando detectar um batimento
-
-//INTERVALO DE LEITURA
-#define intervalo 10000
-
+const int botao=4;
 
 //CRIANDO VARIAVEIS E INSTANCIANDO OBJETOS
 BH1750 luximetro;
@@ -28,11 +24,8 @@ float Umidade = 0;
 float Iluminancia = 0;
 double RMSSD = 0;
 int Threshold = 520;           // Determina a partir de qual valor uma leitura será considerada como uma onda R (início de um novo batimento)
-bool interrupcao=0; 
 
-unsigned long delayIntervalo = 0;
 unsigned long tempoInicio = 0;
-
 
 //Declarando funções
 int Medir_Ibi();
@@ -51,33 +44,34 @@ void setup()
   serial_com.begin(9600); //Serial ARD-Node
   Wire.begin(); //Comunicação I2C
 
+  pinMode(botao, INPUT_PULLUP);
+
   //Parametrização do objeto PulseSensor
   pulseSensor.analogInput(PulseWire);     //Define o pino de entrada do objeto
   pulseSensor.blinkOnPulse(LED13);       //Faz o Led piscar automaticamente quando um batimento for detectado
   pulseSensor.setThreshold(Threshold);   //Define o limite mínimo para que um pulso seja considerado um batimento
-
-  if (pulseSensor.begin()) {
-    Serial.println("Sensor de monitoramento cardíaco funcionando normalmente");
-  }
   
   luximetro.begin();
 
-  delay(10000);
-  calculo_RMSSD();
-
-  pinMode(pinInterrupcao, INPUT);
-  //attachInterrupt(digitalPinToInterrupt(pinInterrupcao), calculo_RMSSD, RISING);  //declara a interrupção externa para o pino 2 quando houver alteração no estado da porta de LOW para HIGH
+  delay(500);
     
 }
 
 void loop()
 {
 
-  if ( (millis() - delayIntervalo) > intervalo ) {
+  if(digitalRead(botao)==LOW){
+    Serial.println("Aguarde o fim das medições e o envio das informações");
     //LEITURA DOS DADOS
+    if (pulseSensor.begin()) {
+      Serial.println("Sensor de monitoramento cardíaco funcionando normalmente");
+      calculo_RMSSD();
+    }
+    
     ler_Temp_Umi_Ilu();
     enviar_dados_serial();
-  };
+    delay(500);
+  }
 
 }
 
@@ -115,35 +109,14 @@ void calculo_RMSSD(){
       }
       
   }
-
-  Serial.print("Nº de amostras:");
-  Serial.println(cont);
-
-  for(int i=0; i<cont; i++){
-    Serial.print("IBI ");
-    Serial.print(i+1);
-    Serial.print(": ");
-    Serial.println(intervalos[i]);
-    delay(50);
-  }
   
   for(int i=0; i<cont; i++){
 
     numerador += pow(double(intervalos[i]) - double(intervalos[i+1]), 2);
-    Serial.print(double(intervalos[i]));
-    Serial.print("-");
-    Serial.print(double(intervalos[i+1]));
-    Serial.print("=");
-    Serial.println(double(intervalos[i]) - double(intervalos[i+1]));
     
   }
 
   RMSSD = sqrt(numerador/double(cont-1.0));
-  Serial.print("Num: ");
-  Serial.println(numerador);
-  Serial.println("RMSSD: ");
-  Serial.println(RMSSD);
-
   
 }
 
@@ -153,7 +126,7 @@ void ler_Temp_Umi_Ilu(){
       Umidade = sensorDHT.humidity;
       Temperatura = sensorDHT.temperature;
       Iluminancia = luximetro.readLightLevel();
-      delayIntervalo = millis();
+      
 }
 
 int Medir_Ibi(){                            //Função para medir e retornar o intervalo entre os batimentos (Inter Beat Interval - IBI) em ms
