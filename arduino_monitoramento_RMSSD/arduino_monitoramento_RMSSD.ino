@@ -1,7 +1,6 @@
 #define USE_ARDUINO_INTERRUPTS true    // Habilita interrupções de baixo nível para um funcionamento mais preciso do Sensor de monitoramento cardíaco
 
 //INCLUSÃO DAS BIBLIOTECAS
-#include <dht.h>
 #include <SoftwareSerial.h>
 #include <ArduinoJson.h>
 #include <PulseSensorPlayground.h>
@@ -9,18 +8,15 @@
 #include <BH1750.h>
 
 //DEFINIÇÃO DE PINOS
-#define pinSensor 7             //Pino utilizado para ler o valor do Sensor DHT22
 const int PulseWire = A0;       // Pino utilizado para medir receber a saída do Sensor monitor cardíaco
 const int LED13 = 13;          // Determina que o Pin 13 que corresponde ao LED  imbuitido no arduino pisque quando detectar um batimento
 const int botao=4;
 
+
 //CRIANDO VARIAVEIS E INSTANCIANDO OBJETOS
 BH1750 luximetro;
-dht sensorDHT;
 PulseSensorPlayground pulseSensor;
 
-float Temperatura = 0;
-float Umidade = 0;
 float Iluminancia = 0;
 double RMSSD = 0;
 int Threshold = 520;           // Determina a partir de qual valor uma leitura será considerada como uma onda R (início de um novo batimento)
@@ -30,7 +26,6 @@ unsigned long tempoInicio = 0;
 //Declarando funções
 int Medir_Ibi();
 void calculo_RMSSD();
-void ler_Temp_Umi();
 void enviar_dados_serial();
 
 //Cria uma Serial para comunicação do Arduino com a ESP, onde 5=Rx & 6=Tx
@@ -61,16 +56,18 @@ void loop()
 {
 
   if(digitalRead(botao)==LOW){
+
+    //LEITURA DE DADOS
     Serial.println("Aguarde o fim das medições e o envio das informações");
     //LEITURA DOS DADOS
     if (pulseSensor.begin()) {
       Serial.println("Sensor de monitoramento cardíaco funcionando normalmente");
       calculo_RMSSD();
     }
-    
-    ler_Temp_Umi_Ilu();
+    Iluminancia = luximetro.readLightLevel();
+
+    //ENVIO DOS DADOS
     enviar_dados_serial();
-    delay(500);
   }
 
 }
@@ -80,8 +77,6 @@ void enviar_dados_serial(){
   StaticJsonDocument<1000> dados;
   
   //Grava os dados medidos no JSON
-  dados["Umidade"] = Umidade;
-  dados["Temperatura"] = Temperatura;
   dados["RMSSD"] = RMSSD;
   dados["Iluminancia"] = Iluminancia;
   
@@ -118,15 +113,6 @@ void calculo_RMSSD(){
 
   RMSSD = sqrt(numerador/double(cont-1.0));
   
-}
-
-void ler_Temp_Umi_Ilu(){
-  
-      int chk = sensorDHT.read22(pinSensor);
-      Umidade = sensorDHT.humidity;
-      Temperatura = sensorDHT.temperature;
-      Iluminancia = luximetro.readLightLevel();
-      
 }
 
 int Medir_Ibi(){                            //Função para medir e retornar o intervalo entre os batimentos (Inter Beat Interval - IBI) em ms

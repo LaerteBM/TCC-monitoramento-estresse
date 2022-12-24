@@ -16,10 +16,14 @@
 #include <WiFiClientSecureBearSSL.h>
 #include <SoftwareSerial.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
 
 //Declaração de objetos
 ESP8266WiFiMulti WiFiMulti;
 HTTPClient https;
+const byte dhtPin = 5;
+#define DHTTYPE DHT22
+DHT dht(dhtPin, DHTTYPE);
 
 //D6 = 12 = Rx & D5 = 14 = Tx
 SoftwareSerial serial_com(12, 14);
@@ -29,7 +33,7 @@ SoftwareSerial serial_com(12, 14);
 #define STASSID "brisa-1209088"
 #define STAPSK  "yhiwtgzt"
 #endif
- 
+
 // DECLARAÇÃO DE VARIÁVEIS PARA WIFI
 const char* ssid = STASSID;
 const char* password = STAPSK;
@@ -42,6 +46,10 @@ const char fingerprint[] PROGMEM = "7B 88 90 87 DF BA 18 94 C7 1E 39 60 B3 F8 42
 int periodo = 10000;
 unsigned long timeNow = 0;
 
+float Temperatura = 0;
+float Umidade = 0;
+
+void ler_Temp_Umi();
 
 void setup() {
   //INICIALIZAÇÃO DA SERIAL E INÍCIO DA CONEXÃO WIFI
@@ -68,10 +76,18 @@ void loop() {
     client->setFingerprint(fingerprint);
 
     if (https.begin(*client, url)) {
+      ler_Temp_Umi();
       postAmbiente(); 
       https.end();
     }
   }
+}
+
+void ler_Temp_Umi(){
+
+      Umidade = dht.readHumidity();
+      Temperatura = dht.readTemperature();
+      
 }
 
 void postAmbiente() {
@@ -83,6 +99,8 @@ void postAmbiente() {
   if(json.isNull()); // VERIFICA SE O JSON RECEBIDO POSSUI DADOS
   else{
     
+    dados["Umidade"] = Umidade;
+    dados["Temperatura"] = Temperatura;
     String jsonOutput;
     serializeJson(dados, jsonOutput);
     
@@ -98,6 +116,6 @@ void postAmbiente() {
     Serial.print("Código de resposta HTTP: ");
     Serial.println(resCode); 
   }
-  
+
   
 }
